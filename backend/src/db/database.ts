@@ -4,8 +4,11 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, "../../data");
-const DB_PATH = path.join(DATA_DIR, "cold-dialer.db");
+const DEFAULT_DATA_DIR = path.resolve(__dirname, "../../data");
+const DB_PATH = process.env.DATABASE_PATH
+  ? path.resolve(process.env.DATABASE_PATH)
+  : path.join(DEFAULT_DATA_DIR, "cold-dialer.db");
+const DATA_DIR = path.dirname(DB_PATH);
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -19,7 +22,8 @@ db.pragma("foreign_keys = ON");
 db.exec(`
   CREATE TABLE IF NOT EXISTS profiles (
     id TEXT PRIMARY KEY,
-    email TEXT NOT NULL,
+    email TEXT NOT NULL COLLATE NOCASE,
+    password_hash TEXT,
     full_name TEXT,
     role TEXT NOT NULL DEFAULT 'agent' CHECK (role IN ('admin', 'agent', 'manager')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -124,5 +128,34 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appointments_user ON appointments(user_id);
   CREATE INDEX IF NOT EXISTS idx_dnc_phone ON dnc_list(phone);
 `);
+
+// SQLite does not support ADD COLUMN IF NOT EXISTS. Inspect the schema first so
+// installations created before password_hash was introduced retain all data.
+const profileColumns = db
+  .prepare("PRAGMA table_info(profiles)")
+  .all() as Array<{ name: string }>;
+
+if (!profileColumns.some((column) => column.name === "password_hash")) {
+  db.exec("ALTER TABLE profiles ADD COLUMN password_hash TEXT");
+}
+
+// New databases enforce one account per normalized email. Add the same
+// constraint to legacy databases when their existing data permits it; never
+// discard profiles merely to create the index.
+const duplicateEmail = db
+  .prepare(
+    "SELECT 1 FROM profiles GROUP BY email COLLATE NOCASE HAVING COUNT(*) > 1 LIMIT 1"
+  )
+  .get();
+
+if (!duplicateEmail) {
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_email_unique ON profiles(email COLLATE NOCASE)"
+  );
+} else {
+  console.warn(
+    "profiles contains duplicate email addresses; resolve them before a unique email index can be enforced"
+  );
+}
 
 export default db;

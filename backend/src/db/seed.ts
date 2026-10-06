@@ -1,6 +1,7 @@
 import db from "./database.js";
 import { v4 as uuid } from "uuid";
 import bcrypt from "bcryptjs";
+import { normalizeEmail, passwordValidationError } from "../auth/credentials.js";
 
 const FIRST_NAMES = [
   "James", "Mary", "Robert", "Patricia", "John", "Jennifer", "Michael",
@@ -51,11 +52,20 @@ function randomPhone(): string {
 function seed() {
   console.log("Seeding database...");
 
+  const adminEmail = normalizeEmail(process.env.SEED_ADMIN_EMAIL);
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  const passwordError = passwordValidationError(adminPassword);
+  if (!adminEmail || passwordError || typeof adminPassword !== "string") {
+    throw new Error(
+      "Set SEED_ADMIN_EMAIL and a valid SEED_ADMIN_PASSWORD before running the seed"
+    );
+  }
+
   const userId = uuid();
-  const passwordHash = bcrypt.hashSync("password123", 10);
+  const passwordHash = bcrypt.hashSync(adminPassword, 12);
   db.prepare(
-    "INSERT INTO profiles (id, email, full_name, role) VALUES (?, ?, ?, ?)"
-  ).run(userId, "admin@example.com", "Admin User", "admin");
+    "INSERT INTO profiles (id, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?)"
+  ).run(userId, adminEmail, passwordHash, "Admin User", "admin");
 
   const campaignIds: string[] = [];
   const campaignNames = ["Q1 Outreach", "Medical Practices NJ"];

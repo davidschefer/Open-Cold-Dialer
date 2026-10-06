@@ -5,6 +5,7 @@ import leadsRoutes from "./routes/leads.js";
 import campaignsRoutes from "./routes/campaigns.js";
 import callLogsRoutes from "./routes/callLogs.js";
 import scriptsRoutes from "./routes/scripts.js";
+import { assertJwtConfiguration } from "./middleware/auth.js";
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000", 10);
@@ -21,6 +22,8 @@ app.use("/api/leads", leadsRoutes);
 app.use("/api/campaigns", campaignsRoutes);
 app.use("/api/call-logs", callLogsRoutes);
 app.use("/api/scripts", scriptsRoutes);
+
+assertJwtConfiguration();
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Cold Dialer API running on http://localhost:${PORT}`);

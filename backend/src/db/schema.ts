@@ -3,6 +3,10 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 export const profiles = sqliteTable("profiles", {
   id: text("id").primaryKey(),
   email: text("email").notNull(),
+  // Kept nullable so existing SQLite databases can be migrated without losing
+  // profiles. Accounts created before the migration must have a password set
+  // before they can authenticate with the local backend.
+  passwordHash: text("password_hash"),
   fullName: text("full_name"),
   role: text("role", { enum: ["admin", "agent", "manager"] })
     .notNull()

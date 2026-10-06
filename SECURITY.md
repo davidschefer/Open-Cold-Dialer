@@ -8,7 +8,7 @@ If you discover a security vulnerability within Cold Dialer, please send an emai
 
 When deploying Cold Dialer:
 
-1. **Change default secrets**: Update `JWT_SECRET` in production
+1. **Set a strong JWT secret**: `JWT_SECRET` is required in production and must be at least 32 bytes
 2. **Use HTTPS**: Always deploy behind HTTPS
 3. **Secure SIP credentials**: Never commit SIP passwords to version control
 4. **Database security**: Use file permissions to restrict database access
@@ -25,8 +25,9 @@ Use `.env.example` as a template.
 ## Authentication
 
 - JWT tokens expire after 7 days
-- Passwords are hashed with bcrypt
+- Passwords are stored only as bcrypt hashes
 - Auth middleware validates all API requests
+- Public signup is disabled by default in production. Set `ALLOW_PUBLIC_SIGNUP=true` only when self-registration is required.
 
 ## SIP Security
 

@@ -17,8 +17,8 @@ echo "JWT_SECRET=$JWT_SECRET" >> .env.local
 # Build and start
 docker compose up -d
 
-# Seed the database
-docker compose exec backend npm run seed
+# Create the first administrator (do not put this password in source control)
+docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='<choose-a-strong-password>' backend npm run create-admin
 
 # Access at http://localhost:3000
 ```
@@ -53,7 +53,7 @@ nano .env.local  # Add your SIP credentials
 
 # Start
 docker compose up -d
-docker compose exec backend npm run seed
+docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='<choose-a-strong-password>' backend npm run create-admin
 ```
 
 ### Reverse Proxy (Nginx)
@@ -95,4 +95,7 @@ See [HOSTINGER_SETUP.md](../scripts/HOSTINGER_SETUP.md)
 |----------|----------|-------------|
 | PORT | No | Server port (default: 4000) |
 | JWT_SECRET | Yes | Secret for JWT tokens |
-| DATABASE_URL | No | SQLite database path |
+| DATABASE_PATH | No | SQLite database path (default: `backend/data/cold-dialer.db`) |
+| ALLOW_PUBLIC_SIGNUP | No | Set to `true` only when public self-registration is intended; disabled by default in production |
+| ADMIN_EMAIL / ADMIN_PASSWORD | One-time | Required by `npm run create-admin` to bootstrap the first production administrator |
+| SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD | Seed only | Required by `npm run seed`; use only for non-production sample data |

@@ -68,7 +68,7 @@ cd Open-Cold-Dialer
 # Backend
 cd backend
 npm install
-npm run seed
+SEED_ADMIN_EMAIL=admin@example.com SEED_ADMIN_PASSWORD='<choose-a-strong-password>' npm run seed
 npm run dev
 
 # Frontend (new terminal)
@@ -81,7 +81,8 @@ npm run dev
 
 Open http://localhost:3000 — 20 sample leads pre-loaded.
 
-**Default login:** `admin@example.com` / `password123`
+The seed intentionally requires credentials through environment variables and does
+not include a default password.
 
 ### Option 2: Docker
 
@@ -90,7 +91,7 @@ git clone https://github.com/6t9xstar/Open-Cold-Dialer.git
 cd Open-Cold-Dialer
 cp .env.example .env.local
 docker compose up -d
-docker compose exec backend npm run seed
+docker compose exec -e SEED_ADMIN_EMAIL=admin@example.com -e SEED_ADMIN_PASSWORD='<choose-a-strong-password>' backend npm run seed
 ```
 
 ### Option 3: Supabase (Cloud)
