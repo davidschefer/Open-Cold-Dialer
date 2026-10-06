@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLead, useLeads } from "@/hooks/useLeads";
 import { useCallLog } from "@/hooks/useCallLogs";
 import { useCreateCallLog } from "@/hooks/useCallLogs";
@@ -11,11 +12,14 @@ import { useCampaigns } from "@/hooks/useCampaigns";
 import { useScripts } from "@/hooks/useScripts";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { ArrowLeft, Edit3, Trash2, Phone, Clock, Mail, Globe, MapPin, FileText, Calendar } from "lucide-react";
+import { api } from "@/lib/apiClient";
+import { mailtoUrl, whatsappUrl } from "@/lib/phone";
+import { ArrowLeft, Edit3, Trash2, Phone, Clock, Mail, Globe, MapPin, FileText, Calendar, MessageCircle, Ban } from "lucide-react";
 
 export function LeadDetailPage() {
   const { leadId } = useParams<{ leadId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: lead, isLoading } = useLead(leadId ?? "");
   const { data: leads = [] } = useLeads();
   const { data: campaigns = [] } = useCampaigns();
@@ -35,8 +39,31 @@ export function LeadDetailPage() {
     ? scripts.find((script) => script.is_active && script.campaign_id === lead.campaign_id)
       ?? scripts.find((script) => script.is_active && !script.campaign_id)
     : undefined;
+  const isDnc = Boolean(lead?.dnc || lead?.status === "do_not_contact");
+  const whatsappLink = lead && !isDnc && lead.whatsapp_consent
+    ? whatsappUrl(lead.phone ?? "", lead.first_name)
+    : null;
 
-  async function handleCallEnd(data: { outcome: string; duration: number; notes: string; direction: "outbound" | "inbound" }) {
+  async function handleDncToggle() {
+    if (!lead?.phone) return;
+    try {
+      if (isDnc) {
+        await api.dnc.remove(lead.phone);
+        setCallFeedback("Telefone removido de Não contatar.");
+      } else {
+        await api.dnc.add({ phone: lead.phone, lead_id: lead.id, reason: "Marcado manualmente", source: "lead_detail" });
+        setCallFeedback("Telefone marcado como Não contatar.");
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["leads"] }),
+        queryClient.invalidateQueries({ queryKey: ["leads", lead.id] }),
+      ]);
+    } catch (err) {
+      setCallFeedback(err instanceof Error ? err.message : "Não foi possível atualizar o bloqueio DNC.");
+    }
+  }
+
+  async function handleCallEnd(data: { outcome: string; duration: number; notes: string; direction: "outbound" | "inbound"; whatsappConsent: boolean }) {
     if (!lead) throw new Error("Lead not found");
     const endedAt = new Date();
     const startedAt = new Date(endedAt.getTime() - data.duration * 1000);
@@ -53,6 +80,7 @@ export function LeadDetailPage() {
       started_at: startedAt.toISOString(),
       ended_at: endedAt.toISOString(),
       notes: data.notes,
+      whatsapp_consent: data.whatsappConsent,
     });
 
     const currentLeadIndex = leads.findIndex((item) => item.id === lead.id);
@@ -106,6 +134,15 @@ export function LeadDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleDncToggle}
+            disabled={!lead.phone}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition disabled:opacity-50 ${isDnc ? "text-green-700 bg-green-50 hover:bg-green-100" : "text-red-700 bg-red-50 hover:bg-red-100"}`}
+            title={isDnc ? "Remover de Não contatar" : "Marcar como Não contatar"}
+          >
+            <Ban className="w-4 h-4" />
+            {isDnc ? "Remover DNC" : "Não contatar"}
+          </button>
           <button onClick={() => setShowEdit(true)} className="p-2 text-gray-400 hover:text-brand-600 rounded-lg hover:bg-brand-50 transition" title="Edit">
             <Edit3 className="w-4 h-4" />
           </button>
@@ -116,6 +153,7 @@ export function LeadDetailPage() {
       </div>
 
       {callFeedback && <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">{callFeedback}</p>}
+      {isDnc && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">Este telefone está bloqueado em Não contatar. Ligações e WhatsApp não estão disponíveis.</p>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -138,7 +176,7 @@ export function LeadDetailPage() {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="w-4 h-4 text-gray-400" />
-                <span className="text-gray-600">{lead.email ?? "—"}</span>
+                {lead.email ? <a className="text-brand-600 hover:text-brand-700" href={mailtoUrl(lead.email, lead.first_name)}>Enviar e-mail</a> : <span className="text-gray-600">—</span>}
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Globe className="w-4 h-4 text-gray-400" />
@@ -148,6 +186,22 @@ export function LeadDetailPage() {
                 <MapPin className="w-4 h-4 text-gray-400" />
                 <span className="text-gray-600">{lead.address ?? "—"}</span>
               </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <a
+                href={whatsappLink ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => { if (!whatsappLink) event.preventDefault(); }}
+                aria-disabled={!whatsappLink}
+                title={isDnc ? "WhatsApp bloqueado por Não contatar" : whatsappLink ? "Abrir conversa no WhatsApp" : "WhatsApp ainda não autorizado pelo contato."}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${whatsappLink ? "bg-green-600 text-white hover:bg-green-700" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+              >
+                <MessageCircle className="w-4 h-4" />
+                WhatsApp
+              </a>
+              {!whatsappLink && <p className="text-xs text-gray-500 mt-2">{isDnc ? "WhatsApp bloqueado por Não contatar." : "WhatsApp ainda não autorizado pelo contato."}</p>}
+              {lead.whatsapp_consent && !isDnc && lead.whatsapp_consent_at && <p className="text-xs text-green-700 mt-2">Autorizado em {new Date(lead.whatsapp_consent_at).toLocaleString("pt-BR")}</p>}
             </div>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">

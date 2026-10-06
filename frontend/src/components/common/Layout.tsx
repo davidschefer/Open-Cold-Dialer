@@ -17,16 +17,17 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard", label: "Painel", icon: LayoutDashboard },
   { to: "/leads", label: "Leads", icon: Users },
-  { to: "/campaigns", label: "Campaigns", icon: Target },
+  { to: "/campaigns", label: "Campanhas", icon: Target },
   { to: "/scripts", label: "Scripts", icon: FileText },
-  { to: "/history", label: "Call History", icon: Clock },
-  { to: "/admin", label: "Admin", icon: Shield, adminOnly: true },
+  { to: "/history", label: "Histórico de Ligações", icon: Clock },
+  { to: "/admin", label: "Administração", icon: Shield, adminOnly: true },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -97,7 +98,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition"
           >
             <LogOut className="w-4 h-4" />
-            Sign Out
+            Sair
           </button>
         </div>
       </aside>
@@ -119,11 +120,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition">
+          <div className="relative flex items-center gap-2">
+            <button
+              onClick={() => setPendingOpen((open) => !open)}
+              aria-expanded={pendingOpen}
+              aria-haspopup="dialog"
+              aria-label="Abrir pendências"
+              title="Pendências"
+              className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
             </button>
+            {pendingOpen && (
+              <div role="dialog" aria-label="Pendências" className="absolute right-0 top-11 z-40 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
+                <h2 className="text-sm font-semibold text-gray-900">Pendências</h2>
+                <p className="mt-2 text-sm text-gray-500">Nenhuma pendência no momento.</p>
+              </div>
+            )}
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">

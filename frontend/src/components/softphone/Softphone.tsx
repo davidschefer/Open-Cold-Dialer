@@ -25,6 +25,7 @@ interface SoftphoneProps {
     duration: number;
     notes: string;
     direction: "outbound" | "inbound";
+    whatsappConsent: boolean;
   }) => Promise<void>;
 }
 
@@ -47,6 +48,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
   const [callError, setCallError] = useState("");
   const [savingOutcome, setSavingOutcome] = useState(false);
   const [simulatedMode, setSimulatedMode] = useState(!isSipConfigured());
+  const [whatsappConsent, setWhatsappConsent] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionRef = useRef<any>(null);
   const inboundSessionRef = useRef<any>(null);
@@ -245,18 +247,19 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
     setSavingOutcome(true);
     setCallError("");
     try {
-      await onCallEnd({ outcome, duration, notes, direction });
+      await onCallEnd({ outcome, duration, notes, direction, whatsappConsent });
       setCallState("idle");
       setDuration(0);
       setNotes("");
       setOutcome("no_answer");
       setDirection("outbound");
+      setWhatsappConsent(false);
     } catch (err) {
       setCallError(err instanceof Error ? err.message : "Unable to save the call result.");
     } finally {
       setSavingOutcome(false);
     }
-  }, [onCallEnd, outcome, duration, notes, direction]);
+  }, [onCallEnd, outcome, duration, notes, direction, whatsappConsent]);
 
   const handleAcceptIncomingCall = useCallback(async () => {
     const session = inboundSessionRef.current;
@@ -295,13 +298,13 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
   ];
 
   const stateLabel: Record<CallState, string> = {
-    idle: "Ready",
-    connecting: "Connecting...",
-    ringing: incomingCall ? "Incoming Call..." : "Ringing...",
-    active: incomingCall ? "In Call" : "Connected",
-    on_hold: "On Hold",
-    muted: "Muted",
-    ended: "Call Ended",
+    idle: "Pronto",
+    connecting: "Conectando...",
+    ringing: incomingCall ? "Chamada recebida..." : "Chamando...",
+    active: incomingCall ? "Em chamada" : "Conectado",
+    on_hold: "Em espera",
+    muted: "Microfone desligado",
+    ended: "Chamada encerrada",
   };
 
   if (!lead) {
@@ -353,7 +356,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
                 }`} />
               </>
             ) : (
-              <span className="text-white/60 text-xs">Ready</span>
+              <span className="text-white/60 text-xs">Pronto</span>
             )}
           </div>
         </div>
@@ -419,6 +422,8 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
         <div className="flex justify-center">
           <button
             onClick={() => setKeypadVisible(!keypadVisible)}
+            aria-label="Teclado numérico"
+            title="Teclado numérico"
             className={`p-2 rounded-lg transition ${keypadVisible ? "bg-brand-100 text-brand-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
           >
             <Keyboard className="w-4 h-4" />
@@ -441,37 +446,46 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
 
         <div className="border-t border-gray-100 pt-4 space-y-3">
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Outcome</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Resultado da ligação</label>
             <select
               value={outcome}
               onChange={(e) => setOutcome(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
             >
-              <option value="no_answer">No Answer</option>
-              <option value="answered">Answered</option>
-              <option value="busy">Busy</option>
-              <option value="voicemail">Voicemail</option>
-              <option value="dnc">DNC</option>
-              <option value="wrong_number">Wrong Number</option>
-              <option value="disconnected">Disconnected</option>
+              <option value="no_answer">Não atendeu</option>
+              <option value="answered">Atendida</option>
+              <option value="busy">Ocupado</option>
+              <option value="voicemail">Correio de voz</option>
+              <option value="dnc">Não contatar</option>
+              <option value="wrong_number">Número incorreto</option>
+              <option value="disconnected">Desconectado</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Observações</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none"
-              placeholder="Add call notes..."
+              placeholder="Adicione observações da ligação..."
             />
           </div>
+          <label className="flex items-start gap-2 text-xs text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={whatsappConsent}
+              onChange={(event) => setWhatsappConsent(event.target.checked)}
+              className="mt-0.5"
+            />
+            <span>Autorizou contato por WhatsApp</span>
+          </label>
           <button
             onClick={handleSaveOutcome}
             disabled={callState !== "ended" || savingOutcome}
             className="w-full py-2.5 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition"
           >
-            {savingOutcome ? "Saving..." : "Save & Next"}
+            {savingOutcome ? "Salvando..." : "Salvar e Próximo"}
           </button>
         </div>
       </div>

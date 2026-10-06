@@ -2,6 +2,7 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import db from "../db/database.js";
 import { authMiddleware, AuthRequest } from "../middleware/auth.js";
+import { normalizePhone } from "../utils/phone.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -34,7 +35,7 @@ router.post("/", (req: AuthRequest, res) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id, first_name || null, last_name || null, company || null,
-    phone || null, email || null, website || null, address || null,
+    (normalizePhone(phone) ?? phone) || null, email || null, website || null, address || null,
     city || null, state || null, zip || null, status || "new",
     source || null, campaign_id || null, assigned_to || null,
     tags ? JSON.stringify(tags) : null, notes || null,
@@ -55,17 +56,33 @@ router.patch("/:id", (req, res) => {
   const fields = [
     "first_name", "last_name", "company", "phone", "email", "website",
     "address", "city", "state", "zip", "status", "source", "campaign_id",
-    "assigned_to", "tags", "notes", "dnc", "last_called_at", "call_count",
+    "assigned_to", "tags", "notes", "last_called_at", "call_count",
   ];
+
+  const effectivePhone = req.body.phone === undefined
+    ? existing.phone
+    : normalizePhone(req.body.phone) ?? req.body.phone;
+  const phoneIsDnc = Boolean(effectivePhone) && (db.prepare("SELECT phone FROM dnc_list").all() as Array<{ phone: string }>)
+    .some((entry) => normalizePhone(entry.phone) === normalizePhone(effectivePhone));
+
+  if (req.body.status === "do_not_contact" && !phoneIsDnc) {
+    res.status(400).json({ error: "Use the Do Not Contact action to block a phone number" });
+    return;
+  }
 
   const updates: string[] = [];
   const values: any[] = [];
 
   for (const field of fields) {
     if (req.body[field] !== undefined) {
+      if (field === "status" && phoneIsDnc) continue;
       updates.push(`${field} = ?`);
-      values.push(field === "tags" ? JSON.stringify(req.body[field]) : req.body[field]);
+      values.push(field === "tags" ? JSON.stringify(req.body[field]) : field === "phone" ? effectivePhone : req.body[field]);
     }
+  }
+
+  if (phoneIsDnc) {
+    updates.push("dnc = 1", "status = 'do_not_contact'");
   }
 
   if (updates.length === 0) {
@@ -112,7 +129,7 @@ router.post("/import", (req: AuthRequest, res) => {
           row.first_name || null,
           row.last_name || null,
           row.company || null,
-          row.phone || null,
+          (normalizePhone(row.phone) ?? row.phone) || null,
           row.email || null,
           row.website || null,
           row.address || null,
@@ -152,6 +169,8 @@ function mapLead(row: any) {
     tags: row.tags ? JSON.parse(row.tags) : null,
     notes: row.notes,
     dnc: Boolean(row.dnc),
+    whatsapp_consent: Boolean(row.whatsapp_consent),
+    whatsapp_consent_at: row.whatsapp_consent_at,
     last_called_at: row.last_called_at,
     call_count: row.call_count,
     created_at: row.created_at,

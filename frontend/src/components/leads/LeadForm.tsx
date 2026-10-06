@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { useCampaigns } from "@/hooks/useCampaigns";
+import { formatBrazilianPhone, formatPhoneForStorage, splitPhoneForInput } from "@/lib/phone";
 
 interface LeadFormData {
   first_name: string;
@@ -33,8 +34,8 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
     first_name: initialData?.first_name ?? "",
     last_name: initialData?.last_name ?? "",
     company: initialData?.company ?? "",
-    phone_country: "+1",
-    phone: initialData?.phone ?? "",
+    phone_country: splitPhoneForInput(initialData?.phone).country,
+    phone: splitPhoneForInput(initialData?.phone).number,
     email: initialData?.email ?? "",
     website: initialData?.website ?? "",
     address: initialData?.address ?? "",
@@ -47,13 +48,8 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
   });
 
   useEffect(() => {
-    if (initialData?.phone && initialData.phone.startsWith("+1")) {
-      setFormData((prev) => ({
-        ...prev,
-        phone_country: "+1",
-        phone: initialData?.phone?.slice(2) ?? "",
-      }));
-    }
+    const phone = splitPhoneForInput(initialData?.phone);
+    setFormData((prev) => ({ ...prev, phone_country: phone.country, phone: phone.number }));
   }, [initialData]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,7 +57,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
     setError("");
     const cleaned: LeadFormData = { ...formData };
     if (!cleaned.campaign_id) cleaned.campaign_id = null as any;
-    const fullPhone = `${cleaned.phone_country}${cleaned.phone}`;
+    const fullPhone = formatPhoneForStorage(cleaned.phone_country, cleaned.phone);
     setSaving(true);
     try {
       await onSubmit({ ...cleaned, phone: fullPhone, phone_country: undefined as any });
@@ -77,7 +73,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
       <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">
-            {initialData?.first_name ? "Edit Lead" : "New Lead"}
+            {initialData?.first_name ? "Editar Lead" : "Novo Lead"}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />
@@ -87,7 +83,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">{error}</p>}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
               <input
                 type="text"
                 value={formData.first_name}
@@ -98,7 +94,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sobrenome</label>
               <input
                 type="text"
                 value={formData.last_name}
@@ -110,20 +106,20 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Campaign</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Campanha</label>
             <select
               value={formData.campaign_id}
               onChange={(e) => setFormData((prev) => ({ ...prev, campaign_id: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
             >
-              <option value="">No campaign</option>
+              <option value="">Sem campanha</option>
               {campaigns.map((campaign) => (
                 <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
             <input
               type="text"
               value={formData.company}
@@ -135,14 +131,15 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
               <div className="flex">
                 <select
                   value={formData.phone_country}
                   onChange={(e) => setFormData((prev) => ({ ...prev, phone_country: e.target.value }))}
                   className="w-20 px-2 py-2 border border-gray-300 rounded-l-lg text-sm bg-gray-50 focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
                 >
-                  <option value="+1">+1 (US)</option>
+                  <option value="+55">+55 (Brasil)</option>
+                  <option value="+1">+1 (EUA)</option>
                 </select>
                 <input
                   type="tel"
@@ -150,7 +147,8 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
                   onChange={(e) =>
                     setFormData((prev) => ({ ...prev, phone: e.target.value }))
                   }
-                  placeholder="(862) 366-7732"
+                  onBlur={() => setFormData((prev) => prev.phone_country === "+55" ? { ...prev, phone: formatBrazilianPhone(prev.phone) } : prev)}
+                  placeholder="(51) 99999-9999"
                   className="flex-1 px-3 py-2 border border-l-0 border-gray-300 rounded-r-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
                 />
               </div>
@@ -168,7 +166,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Site</label>
             <input
               type="url"
               value={formData.website}
@@ -179,7 +177,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
             <input
               type="text"
               value={formData.address}
@@ -191,7 +189,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
               <input
                 type="text"
                 value={formData.city}
@@ -202,7 +200,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
               <input
                 type="text"
                 value={formData.state}
@@ -213,7 +211,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ZIP</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
               <input
                 type="text"
                 value={formData.zip}
@@ -226,7 +224,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
               <input
                 type="text"
                 value={formData.source}
@@ -234,26 +232,27 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
                   setFormData((prev) => ({ ...prev, source: e.target.value }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
-                placeholder="e.g. website, referral"
+                placeholder="ex.: site, indicação"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
+              {formData.status === "do_not_contact" ? (
+                <p className="px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">Não contatar — use a ação DNC para remover o bloqueio.</p>
+              ) : <select
                 value={formData.status}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, status: e.target.value }))
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
               >
-                <option value="new">New</option>
-                <option value="contacted">Contacted</option>
-                <option value="interested">Interested</option>
-                <option value="not_interested">Not Interested</option>
-                <option value="callback">Callback</option>
-                <option value="converted">Converted</option>
-                <option value="do_not_contact">Do Not Contact</option>
-              </select>
+                <option value="new">Novo</option>
+                <option value="contacted">Contatado</option>
+                <option value="interested">Interessado</option>
+                <option value="not_interested">Não interessado</option>
+                <option value="callback">Retornar ligação</option>
+                <option value="converted">Convertido</option>
+              </select>}
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
@@ -262,14 +261,14 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition"
             >
-              {saving ? "Saving..." : "Save Lead"}
+              {saving ? "Salvando..." : "Salvar Lead"}
             </button>
           </div>
         </form>

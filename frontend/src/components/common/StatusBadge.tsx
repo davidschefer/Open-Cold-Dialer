@@ -1,4 +1,5 @@
 import React from "react";
+import { operationalLabel } from "@/lib/labels";
 
 interface StatusBadgeProps {
   status: string;
@@ -33,7 +34,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     <span
       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${colorClass}`}
     >
-      {status.replace(/_/g, " ")}
+      {operationalLabel(status)}
     </span>
   );
 }

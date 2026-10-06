@@ -3,6 +3,7 @@ import { api } from "@/lib/apiClient";
 import type { Database } from "@/types/database";
 
 type CallLog = Database["public"]["Tables"]["call_logs"]["Row"];
+type CreateCallLog = Omit<CallLog, "id" | "created_at"> & { whatsapp_consent?: boolean };
 
 export function useCallLogs() {
   return useQuery<CallLog[]>({
@@ -21,7 +22,7 @@ export function useCallLog(leadId: string) {
 
 export function useCreateCallLog() {
   const queryClient = useQueryClient();
-  return useMutation<CallLog, Error, Omit<CallLog, "id" | "created_at">>({
+  return useMutation<CallLog, Error, CreateCallLog>({
     mutationFn: (log) => api.callLogs.create(log),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["callLogs"] });

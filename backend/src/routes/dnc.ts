@@ -28,24 +28,28 @@ router.post("/", (req: AuthRequest, res) => {
   const existing = findByNormalizedPhone(phone);
   const reason = typeof req.body.reason === "string" ? req.body.reason : null;
   const source = typeof req.body.source === "string" ? req.body.source : null;
-  let id: string;
+  let id = existing?.id ?? "";
 
-  if (existing) {
-    id = existing.id;
-    db.prepare("UPDATE dnc_list SET phone = ?, reason = ?, source = ? WHERE id = ?")
-      .run(phone, reason, source, id);
-  } else {
-    id = uuid();
-    db.prepare(
-      "INSERT INTO dnc_list (id, phone, reason, source, created_by) VALUES (?, ?, ?, ?, ?)"
-    ).run(id, phone, reason, source, req.userId ?? null);
-  }
+  db.transaction(() => {
+    if (existing) {
+      id = existing.id;
+      db.prepare("UPDATE dnc_list SET phone = ?, reason = ?, source = ? WHERE id = ?")
+        .run(phone, reason, source, id);
+    } else {
+      id = uuid();
+      db.prepare(
+        "INSERT INTO dnc_list (id, phone, reason, source, created_by) VALUES (?, ?, ?, ?, ?)"
+      ).run(id, phone, reason, source, req.userId ?? null);
+    }
 
-  if (typeof req.body.lead_id === "string" && req.body.lead_id) {
-    db.prepare(
+    const matchingLeads = (db.prepare("SELECT id, phone FROM leads").all() as Array<{ id: string; phone: string | null }>)
+      .filter((lead) => normalizePhone(lead.phone) === phone);
+    const markDnc = db.prepare(
       "UPDATE leads SET dnc = 1, status = 'do_not_contact', updated_at = ? WHERE id = ?"
-    ).run(new Date().toISOString(), req.body.lead_id);
-  }
+    );
+    const updatedAt = new Date().toISOString();
+    for (const lead of matchingLeads) markDnc.run(updatedAt, lead.id);
+  })();
 
   const entry = db.prepare("SELECT * FROM dnc_list WHERE id = ?").get(id) as DncRow;
   res.status(existing ? 200 : 201).json(mapDnc(entry));

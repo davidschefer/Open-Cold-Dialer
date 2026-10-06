@@ -37,7 +37,7 @@ export function CallHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Call History</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Histórico de Ligações</h1>
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -56,14 +56,14 @@ export function CallHistoryPage() {
             onChange={(e) => setOutcomeFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
           >
-            <option value="all">All Outcomes</option>
-            <option value="answered">Answered</option>
-            <option value="no_answer">No Answer</option>
-            <option value="busy">Busy</option>
-            <option value="voicemail">Voicemail</option>
-            <option value="dnc">DNC</option>
-            <option value="wrong_number">Wrong Number</option>
-            <option value="disconnected">Disconnected</option>
+            <option value="all">Todos os resultados</option>
+            <option value="answered">Atendida</option>
+            <option value="no_answer">Não atendeu</option>
+            <option value="busy">Ocupado</option>
+            <option value="voicemail">Correio de voz</option>
+            <option value="dnc">Não contatar</option>
+            <option value="wrong_number">Número incorreto</option>
+            <option value="disconnected">Desconectado</option>
           </select>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { LeadForm } from "@/components/leads/LeadForm";
 import { CsvImport } from "@/components/leads/CsvImport";
+import { mailtoUrl } from "@/lib/phone";
 import { Search, Plus, Filter, Mail, Phone, MoreHorizontal, Edit3, Upload } from "lucide-react";
 import type { Database } from "@/types/database";
 
@@ -158,19 +159,22 @@ export function LeadsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        value={lead.status}
-                        onChange={(e) => handleStatusChange(lead.id, e.target.value)}
-                        className="text-xs border-none bg-transparent focus:ring-0 cursor-pointer"
-                      >
-                        <option value="new">New</option>
-                        <option value="contacted">Contacted</option>
-                        <option value="interested">Interested</option>
-                        <option value="not_interested">Not Interested</option>
-                        <option value="callback">Callback</option>
-                        <option value="converted">Converted</option>
-                        <option value="do_not_contact">DNC</option>
-                      </select>
+                      {lead.dnc || lead.status === "do_not_contact" ? (
+                        <StatusBadge status="do_not_contact" />
+                      ) : (
+                        <select
+                          value={lead.status}
+                          onChange={(e) => handleStatusChange(lead.id, e.target.value)}
+                          className="text-xs border-none bg-transparent focus:ring-0 cursor-pointer"
+                        >
+                          <option value="new">Novo</option>
+                          <option value="contacted">Contatado</option>
+                          <option value="interested">Interessado</option>
+                          <option value="not_interested">Não interessado</option>
+                          <option value="callback">Retornar ligação</option>
+                          <option value="converted">Convertido</option>
+                        </select>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {lead.last_called_at
@@ -188,9 +192,11 @@ export function LeadsPage() {
                           <Phone className="w-4 h-4" />
                         </button>
                         <a
-                          href={`mailto:${lead.email}`}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 rounded"
-                          title="Email"
+                          href={lead.email ? mailtoUrl(lead.email, lead.first_name) : undefined}
+                          onClick={(event) => { if (!lead.email) event.preventDefault(); }}
+                          className="p-1.5 text-gray-400 hover:text-brand-600 rounded disabled:cursor-not-allowed"
+                          aria-disabled={!lead.email}
+                          title={lead.email ? "Enviar e-mail" : "Lead sem e-mail"}
                         >
                           <Mail className="w-4 h-4" />
                         </a>

@@ -1,6 +1,7 @@
 import React from "react";
 import { useLeads } from "@/hooks/useLeads";
 import { useCallLogs } from "@/hooks/useCallLogs";
+import { operationalLabel } from "@/lib/labels";
 import {
   Users,
   Phone,
@@ -31,10 +32,11 @@ export function DashboardPage() {
             totalCalls
         )
       : 0;
+  const leadsById = new Map((leads ?? []).map((lead) => [lead.id, lead]));
 
   const stats = [
     {
-      label: "Total Leads",
+      label: "Total de leads",
       value: totalLeads,
       icon: Users,
       color: "brand",
@@ -42,7 +44,7 @@ export function DashboardPage() {
       iconClass: "text-brand-600",
     },
     {
-      label: "New Today",
+      label: "Novos hoje",
       value: newLeads,
       icon: TrendingUp,
       color: "emerald",
@@ -50,7 +52,7 @@ export function DashboardPage() {
       iconClass: "text-emerald-600",
     },
     {
-      label: "Interested",
+      label: "Interessados",
       value: interestedLeads,
       icon: CheckCircle,
       color: "amber",
@@ -58,7 +60,7 @@ export function DashboardPage() {
       iconClass: "text-amber-600",
     },
     {
-      label: "Total Calls",
+      label: "Total de ligações",
       value: totalCalls,
       icon: Phone,
       color: "blue",
@@ -66,7 +68,7 @@ export function DashboardPage() {
       iconClass: "text-blue-600",
     },
     {
-      label: "Answered",
+      label: "Atendidas",
       value: answeredCalls,
       icon: Phone,
       color: "green",
@@ -74,7 +76,7 @@ export function DashboardPage() {
       iconClass: "text-green-600",
     },
     {
-      label: "Avg Duration",
+      label: "Duração média",
       value: `${avgDuration}s`,
       icon: Clock,
       color: "purple",
@@ -93,7 +95,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-gray-900">Painel</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
@@ -120,19 +122,21 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Lead Status Distribution
+            Distribuição por status
           </h2>
           <div className="space-y-3">
             {[
-              { label: "New", count: (leads ?? []).filter((l) => l.status === "new").length, color: "bg-brand-500" },
-              { label: "Contacted", count: contactedLeads, color: "bg-blue-500" },
-              { label: "Interested", count: interestedLeads, color: "bg-amber-500" },
-              { label: "Not Interested", count: (leads ?? []).filter((l) => l.status === "not_interested").length, color: "bg-gray-400" },
-              { label: "Converted", count: convertedLeads, color: "bg-green-500" },
+              { status: "new", count: (leads ?? []).filter((l) => l.status === "new").length, color: "bg-brand-500" },
+              { status: "contacted", count: contactedLeads, color: "bg-blue-500" },
+              { status: "interested", count: interestedLeads, color: "bg-amber-500" },
+              { status: "not_interested", count: (leads ?? []).filter((l) => l.status === "not_interested").length, color: "bg-gray-400" },
+              { status: "callback", count: (leads ?? []).filter((l) => l.status === "callback").length, color: "bg-purple-500" },
+              { status: "converted", count: convertedLeads, color: "bg-green-500" },
+              { status: "do_not_contact", count: (leads ?? []).filter((l) => l.status === "do_not_contact").length, color: "bg-red-500" },
             ].map((item) => (
-              <div key={item.label} className="flex items-center gap-3">
+              <div key={item.status} className="flex items-center gap-3">
                 <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
-                <span className="flex-1 text-sm text-gray-600">{item.label}</span>
+                <span className="flex-1 text-sm text-gray-600">{operationalLabel(item.status)}</span>
                 <span className="text-sm font-semibold text-gray-900">{item.count}</span>
               </div>
             ))}
@@ -140,10 +144,10 @@ export function DashboardPage() {
         </div>
         <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Recent Activity
+            Atividade recente
           </h2>
           {callLogs?.length === 0 ? (
-            <p className="text-sm text-gray-500">No call activity yet</p>
+            <p className="text-sm text-gray-500">Nenhuma atividade de ligação ainda.</p>
           ) : (
             <div className="space-y-3">
               {(callLogs ?? [])
@@ -153,8 +157,10 @@ export function DashboardPage() {
                     new Date(a.created_at).getTime()
                 )
                 .slice(0, 5)
-                .map((log) => (
-                  <div
+                .map((log) => {
+                  const lead = log.lead_id ? leadsById.get(log.lead_id) : undefined;
+                  const leadName = lead ? `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim() || lead.phone : null;
+                  return <div
                     key={log.id}
                     className="flex items-center gap-3 p-3 rounded-lg bg-gray-50"
                   >
@@ -163,17 +169,17 @@ export function DashboardPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">
-                        {log.outcome}
+                        {leadName || operationalLabel(log.outcome)}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {log.duration_seconds}s
+                        {operationalLabel(log.outcome)} · {log.duration_seconds}s
                       </p>
                     </div>
                     <span className="text-xs text-gray-400">
                       {new Date(log.created_at).toLocaleDateString()}
                     </span>
-                  </div>
-                ))}
+                  </div>;
+                })}
             </div>
           )}
         </div>

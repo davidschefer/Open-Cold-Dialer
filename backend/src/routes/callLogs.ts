@@ -34,6 +34,7 @@ router.post("/", (req: AuthRequest, res) => {
     lead_id, user_id, campaign_id, direction, outcome,
     duration_seconds, recording_url, notes, transcript,
     sip_call_id, started_at, ended_at,
+    whatsapp_consent,
   } = req.body;
 
   const saveCallLog = db.transaction(() => {
@@ -58,6 +59,12 @@ router.post("/", (req: AuthRequest, res) => {
 
     if (!lead_id) return;
 
+    if (whatsapp_consent === true) {
+      db.prepare(
+        "UPDATE leads SET whatsapp_consent = 1, whatsapp_consent_at = COALESCE(whatsapp_consent_at, ?), updated_at = ? WHERE id = ?"
+      ).run(new Date().toISOString(), new Date().toISOString(), lead_id);
+    }
+
     if (outcome === "dnc") {
       const lead = db.prepare("SELECT phone FROM leads WHERE id = ?").get(lead_id) as
         | { phone: string | null }
@@ -77,6 +84,15 @@ router.post("/", (req: AuthRequest, res) => {
           db.prepare(
             "INSERT INTO dnc_list (id, phone, reason, source, created_by) VALUES (?, ?, ?, ?, ?)"
           ).run(uuid(), phone, "Marked do not contact after call", "call_log", req.userId ?? null);
+        }
+
+        const matchingLeads = (db.prepare("SELECT id, phone FROM leads").all() as Array<{ id: string; phone: string | null }>)
+          .filter((item) => normalizePhone(item.phone) === phone);
+        const markDnc = db.prepare(
+          "UPDATE leads SET dnc = 1, status = 'do_not_contact', updated_at = ? WHERE id = ?"
+        );
+        for (const matchingLead of matchingLeads) {
+          markDnc.run(new Date().toISOString(), matchingLead.id);
         }
       }
       return;

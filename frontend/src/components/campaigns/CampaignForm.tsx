@@ -49,7 +49,7 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-lg w-full">
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">{initialData ? "Edit Campaign" : "New Campaign"}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{initialData ? "Editar Campanha" : "Nova Campanha"}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -83,7 +83,7 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition">{saving ? "Saving..." : "Save Campaign"}</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition">{saving ? "Salvando..." : "Salvar Campanha"}</button>
           </div>
         </form>
       </div>

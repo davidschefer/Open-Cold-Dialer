@@ -60,6 +60,8 @@ db.exec(`
     tags TEXT,
     notes TEXT,
     dnc INTEGER NOT NULL DEFAULT 0,
+    whatsapp_consent INTEGER NOT NULL DEFAULT 0,
+    whatsapp_consent_at TEXT,
     last_called_at TEXT,
     call_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -137,6 +139,18 @@ const profileColumns = db
 
 if (!profileColumns.some((column) => column.name === "password_hash")) {
   db.exec("ALTER TABLE profiles ADD COLUMN password_hash TEXT");
+}
+
+const leadColumns = db
+  .prepare("PRAGMA table_info(leads)")
+  .all() as Array<{ name: string }>;
+
+if (!leadColumns.some((column) => column.name === "whatsapp_consent")) {
+  db.exec("ALTER TABLE leads ADD COLUMN whatsapp_consent INTEGER NOT NULL DEFAULT 0");
+}
+
+if (!leadColumns.some((column) => column.name === "whatsapp_consent_at")) {
+  db.exec("ALTER TABLE leads ADD COLUMN whatsapp_consent_at TEXT");
 }
 
 // New databases enforce one account per normalized email. Add the same

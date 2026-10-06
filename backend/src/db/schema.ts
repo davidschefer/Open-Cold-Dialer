@@ -69,6 +69,8 @@ export const leads = sqliteTable("leads", {
   tags: text("tags"),
   notes: text("notes"),
   dnc: integer("dnc", { mode: "boolean" }).notNull().default(false),
+  whatsappConsent: integer("whatsapp_consent", { mode: "boolean" }).notNull().default(false),
+  whatsappConsentAt: text("whatsapp_consent_at"),
   lastCalledAt: text("last_called_at"),
   callCount: integer("call_count").notNull().default(0),
   createdAt: text("created_at")

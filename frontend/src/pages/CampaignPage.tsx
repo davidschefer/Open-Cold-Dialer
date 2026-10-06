@@ -47,15 +47,15 @@ export function CampaignPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campaigns</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage outbound campaigns</p>
+          <h1 className="text-2xl font-bold text-gray-900">Campanhas</h1>
+          <p className="text-sm text-gray-500 mt-1">Gerencie campanhas de saída</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition"
         >
           <Plus className="w-4 h-4" />
-          New Campaign
+          Nova Campanha
         </button>
       </div>
 

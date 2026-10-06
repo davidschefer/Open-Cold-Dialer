@@ -94,6 +94,8 @@ export type Database = {
           tags: string[] | null;
           notes: string | null;
           dnc: boolean;
+          whatsapp_consent: boolean;
+          whatsapp_consent_at: string | null;
           last_called_at: string | null;
           call_count: number;
           created_at: string;
@@ -118,6 +120,8 @@ export type Database = {
           tags?: string[] | null;
           notes?: string | null;
           dnc?: boolean;
+          whatsapp_consent?: boolean;
+          whatsapp_consent_at?: string | null;
           last_called_at?: string | null;
           call_count?: number;
           created_at?: string;
@@ -141,6 +145,8 @@ export type Database = {
           tags?: string[] | null;
           notes?: string | null;
           dnc?: boolean;
+          whatsapp_consent?: boolean;
+          whatsapp_consent_at?: string | null;
           last_called_at?: string | null;
           call_count?: number;
           updated_at?: string;
