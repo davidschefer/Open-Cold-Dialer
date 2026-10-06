@@ -1,45 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { api } from "@/lib/apiClient";
 import type { Database } from "@/types/database";
 
 type Lead = Database["public"]["Tables"]["leads"]["Row"];
 
-const API_URL = import.meta.env.VITE_API_URL || "";
-const isApiMode = Boolean(API_URL);
-
 export function useLeads() {
   return useQuery<Lead[]>({
     queryKey: ["leads"],
-    queryFn: async () => {
-      if (isApiMode) {
-        return api.leads.list();
-      }
-      const { data, error } = await supabase
-        .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: () => api.leads.list(),
   });
 }
 
 export function useLead(leadId: string) {
   return useQuery<Lead>({
     queryKey: ["leads", leadId],
-    queryFn: async () => {
-      if (isApiMode) {
-        return api.leads.get(leadId);
-      }
-      const { data, error } = await supabase
-        .from("leads")
-        .select("*")
-        .eq("id", leadId)
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => api.leads.get(leadId),
     enabled: !!leadId,
   });
 }
@@ -47,14 +22,7 @@ export function useLead(leadId: string) {
 export function useCreateLead() {
   const queryClient = useQueryClient();
   return useMutation<Lead, Error, Omit<Lead, "id" | "created_at" | "updated_at" | "call_count">>({
-    mutationFn: async (lead) => {
-      if (isApiMode) {
-        return api.leads.create(lead);
-      }
-      const { data, error } = await supabase.from("leads").insert(lead).select().single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: (lead) => api.leads.create(lead),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
     },
@@ -64,19 +32,7 @@ export function useCreateLead() {
 export function useUpdateLead() {
   const queryClient = useQueryClient();
   return useMutation<Lead, Error, Partial<Lead> & { id: string }>({
-    mutationFn: async ({ id, ...updates }) => {
-      if (isApiMode) {
-        return api.leads.update(id, updates);
-      }
-      const { data, error } = await supabase
-        .from("leads")
-        .update(updates)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
+    mutationFn: ({ id, ...updates }) => api.leads.update(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
     },
@@ -86,13 +42,17 @@ export function useUpdateLead() {
 export function useDeleteLead() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: async (id) => {
-      if (isApiMode) {
-        return api.leads.delete(id);
-      }
-      const { error } = await supabase.from("leads").delete().eq("id", id);
-      if (error) throw error;
+    mutationFn: (id) => api.leads.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
     },
+  });
+}
+
+export function useImportLeads() {
+  const queryClient = useQueryClient();
+  return useMutation<{ imported: number; total: number }, Error, Record<string, string | undefined>[]>({
+    mutationFn: (rows) => api.leads.import(rows),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["leads"] });
     },

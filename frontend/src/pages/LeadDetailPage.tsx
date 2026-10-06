@@ -1,11 +1,14 @@
 import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useLead } from "@/hooks/useLeads";
+import { useLead, useLeads } from "@/hooks/useLeads";
 import { useCallLog } from "@/hooks/useCallLogs";
 import { useCreateCallLog } from "@/hooks/useCallLogs";
 import { useUpdateLead, useDeleteLead } from "@/hooks/useLeads";
 import { Softphone } from "@/components/softphone/Softphone";
 import { CallScriptViewer } from "@/components/scripts/CallScriptViewer";
+import { LeadForm } from "@/components/leads/LeadForm";
+import { useCampaigns } from "@/hooks/useCampaigns";
+import { useScripts } from "@/hooks/useScripts";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { ArrowLeft, Edit3, Trash2, Phone, Clock, Mail, Globe, MapPin, FileText, Calendar } from "lucide-react";
@@ -14,6 +17,9 @@ export function LeadDetailPage() {
   const { leadId } = useParams<{ leadId: string }>();
   const navigate = useNavigate();
   const { data: lead, isLoading } = useLead(leadId ?? "");
+  const { data: leads = [] } = useLeads();
+  const { data: campaigns = [] } = useCampaigns();
+  const { data: scripts = [] } = useScripts();
   const { data: callLogs } = useCallLog(leadId ?? "");
   const createCallLog = useCreateCallLog();
   const updateLeadMutation = useUpdateLead();
@@ -22,22 +28,45 @@ export function LeadDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showScript, setShowScript] = useState(false);
+  const [callFeedback, setCallFeedback] = useState("");
 
-  function handleCallEnd(data: { outcome: string; duration: number; notes: string; direction: "outbound" | "inbound" }) {
-    createCallLog.mutateAsync({
-      lead_id: leadId ?? null,
+  const campaign = campaigns.find((item) => item.id === lead?.campaign_id);
+  const selectedScript = lead
+    ? scripts.find((script) => script.is_active && script.campaign_id === lead.campaign_id)
+      ?? scripts.find((script) => script.is_active && !script.campaign_id)
+    : undefined;
+
+  async function handleCallEnd(data: { outcome: string; duration: number; notes: string; direction: "outbound" | "inbound" }) {
+    if (!lead) throw new Error("Lead not found");
+    const endedAt = new Date();
+    const startedAt = new Date(endedAt.getTime() - data.duration * 1000);
+    await createCallLog.mutateAsync({
+      lead_id: lead.id,
       user_id: null,
-      campaign_id: null,
+      campaign_id: lead.campaign_id,
       direction: data.direction,
       outcome: data.outcome as any,
       duration_seconds: data.duration,
       recording_url: null,
       transcript: null,
       sip_call_id: null,
-      started_at: null,
-      ended_at: null,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
       notes: data.notes,
     });
+
+    const currentLeadIndex = leads.findIndex((item) => item.id === lead.id);
+    const nextLead = currentLeadIndex === -1
+      ? undefined
+      : leads.slice(currentLeadIndex + 1).find((item) =>
+          !item.dnc && item.status !== "converted" && item.status !== "do_not_contact"
+        );
+    if (nextLead) {
+      setCallFeedback("Call saved. Opening the next eligible lead...");
+      window.setTimeout(() => navigate(`/leads/${nextLead.id}`), 700);
+    } else {
+      setCallFeedback("Call saved. There is no next eligible lead.");
+    }
   }
 
   if (isLoading) {
@@ -86,6 +115,8 @@ export function LeadDetailPage() {
         </div>
       </div>
 
+      {callFeedback && <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">{callFeedback}</p>}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Softphone lead={lead} onCallEnd={handleCallEnd} />
@@ -94,9 +125,9 @@ export function LeadDetailPage() {
               <FileText className="w-4 h-4 text-brand-600" />
               <h2 className="text-lg font-semibold text-gray-900">Call Script</h2>
             </div>
-            <button onClick={() => setShowScript(true)} className="text-sm text-brand-600 hover:text-brand-700 font-medium">
-              View Script →
-            </button>
+            {selectedScript ? (
+              <button onClick={() => setShowScript(true)} className="text-sm text-brand-600 hover:text-brand-700 font-medium">View Script →</button>
+            ) : <p className="text-sm text-gray-500">No active script is associated with this lead's campaign.</p>}
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact Info</h2>
@@ -132,6 +163,7 @@ export function LeadDetailPage() {
               {[
                 ["Status", lead.status],
                 ["Source", lead.source ?? "—"],
+                ["Campaign", campaign?.name ?? "No campaign"],
                 ["Company", lead.company ?? "—"],
                 ["Phone", lead.phone ?? "—"],
                 ["Email", lead.email ?? "—"],
@@ -185,11 +217,12 @@ export function LeadDetailPage() {
         />
       )}
 
-      {showScript && (
-        <CallScriptViewer
-          onClose={() => setShowScript(false)}
-        />
-      )}
+      {showEdit && <LeadForm initialData={lead as any} onClose={() => setShowEdit(false)} onSubmit={async (data) => {
+        await updateLeadMutation.mutateAsync({ id: lead.id, ...data } as any);
+        setShowEdit(false);
+      }} />}
+
+      {showScript && selectedScript && <CallScriptViewer script={selectedScript} onClose={() => setShowScript(false)} />}
     </div>
   );
 }

@@ -38,6 +38,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <PageSpinner />;
+  if (user?.role !== "admin") return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -66,7 +73,7 @@ function AppRoutes() {
                   <Route path="campaigns" element={<CampaignPage />} />
                   <Route path="scripts" element={<ScriptsPage />} />
                   <Route path="history" element={<CallHistoryPage />} />
-                  <Route path="admin" element={<AdminPage />} />
+                  <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
                 </Routes>
               </Suspense>
             </Layout>

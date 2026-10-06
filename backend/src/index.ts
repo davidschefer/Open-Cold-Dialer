@@ -5,6 +5,7 @@ import leadsRoutes from "./routes/leads.js";
 import campaignsRoutes from "./routes/campaigns.js";
 import callLogsRoutes from "./routes/callLogs.js";
 import scriptsRoutes from "./routes/scripts.js";
+import dncRoutes from "./routes/dnc.js";
 import { assertJwtConfiguration } from "./middleware/auth.js";
 
 const app = express();
@@ -22,6 +23,7 @@ app.use("/api/leads", leadsRoutes);
 app.use("/api/campaigns", campaignsRoutes);
 app.use("/api/call-logs", callLogsRoutes);
 app.use("/api/scripts", scriptsRoutes);
+app.use("/api/dnc", dncRoutes);
 
 assertJwtConfiguration();
 

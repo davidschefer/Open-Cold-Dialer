@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import { useCampaigns } from "@/hooks/useCampaigns";
 
 interface LeadFormData {
   first_name: string;
@@ -25,6 +26,9 @@ interface LeadFormProps {
 }
 
 export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
+  const { data: campaigns = [] } = useCampaigns();
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<LeadFormData>({
     first_name: initialData?.first_name ?? "",
     last_name: initialData?.last_name ?? "",
@@ -54,10 +58,18 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
     const cleaned: LeadFormData = { ...formData };
     if (!cleaned.campaign_id) cleaned.campaign_id = null as any;
     const fullPhone = `${cleaned.phone_country}${cleaned.phone}`;
-    await onSubmit({ ...cleaned, phone: fullPhone, phone_country: undefined as any });
+    setSaving(true);
+    try {
+      await onSubmit({ ...cleaned, phone: fullPhone, phone_country: undefined as any });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save lead.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -72,6 +84,7 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">{error}</p>}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
@@ -95,6 +108,19 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Campaign</label>
+            <select
+              value={formData.campaign_id}
+              onChange={(e) => setFormData((prev) => ({ ...prev, campaign_id: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
+            >
+              <option value="">No campaign</option>
+              {campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>{campaign.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
@@ -240,9 +266,10 @@ export function LeadForm({ onClose, onSubmit, initialData }: LeadFormProps) {
             </button>
             <button
               type="submit"
+              disabled={saving}
               className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition"
             >
-              Save Lead
+              {saving ? "Saving..." : "Save Lead"}
             </button>
           </div>
         </form>

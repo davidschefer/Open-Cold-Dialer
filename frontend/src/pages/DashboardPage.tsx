@@ -16,7 +16,9 @@ export function DashboardPage() {
   const { data: callLogs, isLoading: logsLoading } = useCallLogs();
 
   const totalLeads = leads?.length ?? 0;
-  const newLeads = leads?.filter((l) => l.status === "new").length ?? 0;
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const newLeads = leads?.filter((l) => new Date(l.created_at).getTime() >= startOfToday.getTime()).length ?? 0;
   const contactedLeads = leads?.filter((l) => l.status === "contacted").length ?? 0;
   const interestedLeads = leads?.filter((l) => l.status === "interested").length ?? 0;
   const convertedLeads = leads?.filter((l) => l.status === "converted").length ?? 0;
@@ -122,7 +124,7 @@ export function DashboardPage() {
           </h2>
           <div className="space-y-3">
             {[
-              { label: "New", count: newLeads, color: "bg-brand-500" },
+              { label: "New", count: (leads ?? []).filter((l) => l.status === "new").length, color: "bg-brand-500" },
               { label: "Contacted", count: contactedLeads, color: "bg-blue-500" },
               { label: "Interested", count: interestedLeads, color: "bg-amber-500" },
               { label: "Not Interested", count: (leads ?? []).filter((l) => l.status === "not_interested").length, color: "bg-gray-400" },

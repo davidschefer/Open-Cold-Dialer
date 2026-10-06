@@ -1,12 +1,15 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLeads } from "@/hooks/useLeads";
-import { useCreateLead, useDeleteLead, useUpdateLead } from "@/hooks/useLeads";
+import { useCreateLead, useDeleteLead, useImportLeads, useUpdateLead } from "@/hooks/useLeads";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { LeadForm } from "@/components/leads/LeadForm";
 import { CsvImport } from "@/components/leads/CsvImport";
-import { Search, Plus, Filter, Mail, Phone, MapPin, MoreHorizontal, Download, Upload } from "lucide-react";
+import { Search, Plus, Filter, Mail, Phone, MoreHorizontal, Edit3, Upload } from "lucide-react";
+import type { Database } from "@/types/database";
+
+type Lead = Database["public"]["Tables"]["leads"]["Row"];
 
 type StatusFilter = string | "all";
 
@@ -16,12 +19,15 @@ export function LeadsPage() {
   const createLead = useCreateLead();
   const updateLead = useUpdateLead();
   const deleteLead = useDeleteLead();
+  const importLeads = useImportLeads();
 
   const [showForm, setShowForm] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [feedback, setFeedback] = useState("");
 
   const filteredLeads = useMemo(() => {
     if (!leads) return [];
@@ -41,12 +47,22 @@ export function LeadsPage() {
 
   async function handleDelete() {
     if (!deleteConfirm) return;
-    await deleteLead.mutateAsync(deleteConfirm.id);
-    setDeleteConfirm(null);
+    try {
+      await deleteLead.mutateAsync(deleteConfirm.id);
+      setFeedback("Lead deleted.");
+      setDeleteConfirm(null);
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Unable to delete lead.");
+    }
   }
 
   async function handleStatusChange(leadId: string, newStatus: string) {
-    await updateLead.mutateAsync({ id: leadId, status: newStatus as any });
+    try {
+      await updateLead.mutateAsync({ id: leadId, status: newStatus as any });
+      setFeedback("Lead status updated.");
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Unable to update lead status.");
+    }
   }
 
   return (
@@ -75,6 +91,8 @@ export function LeadsPage() {
           </button>
         </div>
       </div>
+
+      {feedback && <p className="text-sm text-brand-700 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">{feedback}</p>}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -161,13 +179,14 @@ export function LeadsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <a
-                          href={`tel:${lead.phone}`}
-                          className="p-1.5 text-gray-400 hover:text-brand-600 rounded"
-                          title="Call"
+                        <button
+                          onClick={() => navigate(`/leads/${lead.id}`)}
+                          disabled={lead.dnc || lead.status === "do_not_contact"}
+                          className="p-1.5 text-gray-400 hover:text-brand-600 disabled:text-gray-300 disabled:cursor-not-allowed rounded"
+                          title={lead.dnc || lead.status === "do_not_contact" ? "Do Not Contact" : "Open dialer"}
                         >
                           <Phone className="w-4 h-4" />
-                        </a>
+                        </button>
                         <a
                           href={`mailto:${lead.email}`}
                           className="p-1.5 text-gray-400 hover:text-brand-600 rounded"
@@ -175,6 +194,13 @@ export function LeadsPage() {
                         >
                           <Mail className="w-4 h-4" />
                         </a>
+                        <button
+                          onClick={() => setEditingLead(lead)}
+                          className="p-1.5 text-gray-400 hover:text-brand-600 rounded"
+                          title="Edit"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => setDeleteConfirm({ id: lead.id, name: `${lead.first_name} ${lead.last_name}` })}
                           className="p-1.5 text-gray-400 hover:text-red-600 rounded"
@@ -196,8 +222,14 @@ export function LeadsPage() {
         <LeadForm
           onClose={() => setShowForm(false)}
           onSubmit={async (data) => {
-            await createLead.mutateAsync(data as any);
-            setShowForm(false);
+            try {
+              await createLead.mutateAsync(data as any);
+              setFeedback("Lead created.");
+              setShowForm(false);
+            } catch (err) {
+              setFeedback(err instanceof Error ? err.message : "Unable to create lead.");
+              throw err;
+            }
           }}
         />
       )}
@@ -206,10 +238,26 @@ export function LeadsPage() {
         <CsvImport
           onClose={() => setShowCsvImport(false)}
           onImport={async (rows) => {
-            for (const row of rows) {
-              await createLead.mutateAsync(row as any);
+            const result = await importLeads.mutateAsync(rows);
+            setFeedback(`Imported ${result.imported} of ${result.total} leads.`);
+            return result;
+          }}
+        />
+      )}
+
+      {editingLead && (
+        <LeadForm
+          initialData={editingLead as any}
+          onClose={() => setEditingLead(null)}
+          onSubmit={async (data) => {
+            try {
+              await updateLead.mutateAsync({ id: editingLead.id, ...data } as any);
+              setFeedback("Lead updated.");
+              setEditingLead(null);
+            } catch (err) {
+              setFeedback(err instanceof Error ? err.message : "Unable to update lead.");
+              throw err;
             }
-            setShowCsvImport(false);
           }}
         />
       )}

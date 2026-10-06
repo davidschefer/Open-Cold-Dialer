@@ -13,6 +13,7 @@ import {
   Check,
 } from "lucide-react";
 import { getSipConfig, isSipConfigured, getSipDomain, getSipExtension } from "@/sip";
+import { api } from "@/lib/apiClient";
 import type { Database } from "@/types/database";
 
 type Lead = Database["public"]["Tables"]["leads"]["Row"];
@@ -24,7 +25,7 @@ interface SoftphoneProps {
     duration: number;
     notes: string;
     direction: "outbound" | "inbound";
-  }) => void;
+  }) => Promise<void>;
 }
 
 type CallState = "idle" | "connecting" | "ringing" | "active" | "on_hold" | "muted" | "ended";
@@ -43,6 +44,9 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
     callerName: string;
     session: any;
   } | null>(null);
+  const [callError, setCallError] = useState("");
+  const [savingOutcome, setSavingOutcome] = useState(false);
+  const [simulatedMode, setSimulatedMode] = useState(!isSipConfigured());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionRef = useRef<any>(null);
   const inboundSessionRef = useRef<any>(null);
@@ -79,6 +83,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
   };
 
   const startSimulatedCall = useCallback(() => {
+    setSimulatedMode(true);
     setCallState("connecting");
     setTimeout(() => setCallState("ringing"), 1500);
     setTimeout(() => setCallState("active"), 4000);
@@ -86,11 +91,28 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
 
   const startCall = useCallback(async () => {
     if (!phoneNumber) return;
+    setCallError("");
+    if (lead?.dnc || lead?.status === "do_not_contact") {
+      setCallError("This lead is marked Do Not Contact and cannot be called.");
+      return;
+    }
+    try {
+      const dncCheck = await api.dnc.check(phoneNumber);
+      if (dncCheck.dnc) {
+        setCallError("This phone number is on the Do Not Contact list and cannot be called.");
+        return;
+      }
+    } catch (err) {
+      setCallError(err instanceof Error ? `Unable to verify DNC status: ${err.message}` : "Unable to verify DNC status.");
+      return;
+    }
+
     setCallState("connecting");
     setDuration(0);
     setNotes("");
     setOutcome("no_answer");
     wasEstablishedRef.current = false;
+    setSimulatedMode(false);
 
     const sipConfig = getSipConfig();
 
@@ -180,7 +202,7 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
       console.warn("SIP.js call failed, using simulated call:", err);
       startSimulatedCall();
     }
-  }, [phoneNumber, startSimulatedCall]);
+  }, [phoneNumber, lead?.dnc, startSimulatedCall]);
 
   const endCall = useCallback(() => {
     if (sessionRef.current) {
@@ -218,15 +240,22 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
     }
   }, [callState]);
 
-  const handleSaveOutcome = useCallback(() => {
-    if (onCallEnd) {
-      onCallEnd({ outcome, duration, notes, direction });
+  const handleSaveOutcome = useCallback(async () => {
+    if (!onCallEnd) return;
+    setSavingOutcome(true);
+    setCallError("");
+    try {
+      await onCallEnd({ outcome, duration, notes, direction });
+      setCallState("idle");
+      setDuration(0);
+      setNotes("");
+      setOutcome("no_answer");
+      setDirection("outbound");
+    } catch (err) {
+      setCallError(err instanceof Error ? err.message : "Unable to save the call result.");
+    } finally {
+      setSavingOutcome(false);
     }
-    setCallState("idle");
-    setDuration(0);
-    setNotes("");
-    setOutcome("no_answer");
-    setDirection("outbound");
   }, [onCallEnd, outcome, duration, notes, direction]);
 
   const handleAcceptIncomingCall = useCallback(async () => {
@@ -339,6 +368,8 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
             callState === "on_hold" || callState === "muted" ? "text-amber-600" :
             "text-gray-400"
           }`}>{stateLabel[callState]}</p>
+          {simulatedMode && <p className="text-xs text-amber-700 mt-1">Simulation mode — place the real call outside the app.</p>}
+          {callError && <p className="text-xs text-red-600 mt-2">{callError}</p>}
         </div>
 
         <div className="flex items-center justify-center gap-4">
@@ -437,10 +468,10 @@ export function Softphone({ lead, onCallEnd }: SoftphoneProps) {
           </div>
           <button
             onClick={handleSaveOutcome}
-            disabled={callState !== "ended"}
+            disabled={callState !== "ended" || savingOutcome}
             className="w-full py-2.5 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition"
           >
-            Save & Next
+            {savingOutcome ? "Saving..." : "Save & Next"}
           </button>
         </div>
       </div>

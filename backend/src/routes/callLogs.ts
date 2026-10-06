@@ -2,6 +2,7 @@ import { Router } from "express";
 import { v4 as uuid } from "uuid";
 import db from "../db/database.js";
 import { authMiddleware, AuthRequest } from "../middleware/auth.js";
+import { normalizePhone } from "../utils/phone.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -35,30 +36,58 @@ router.post("/", (req: AuthRequest, res) => {
     sip_call_id, started_at, ended_at,
   } = req.body;
 
-  db.prepare(
-    `INSERT INTO call_logs (id, lead_id, user_id, campaign_id, direction, outcome, duration_seconds, recording_url, notes, transcript, sip_call_id, started_at, ended_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    lead_id || null,
-    user_id || req.userId || null,
-    campaign_id || null,
-    direction || "outbound",
-    outcome || "no_answer",
-    duration_seconds || 0,
-    recording_url || null,
-    notes || null,
-    transcript || null,
-    sip_call_id || null,
-    started_at || null,
-    ended_at || null
-  );
-
-  if (lead_id) {
+  const saveCallLog = db.transaction(() => {
     db.prepare(
-      "UPDATE leads SET last_called_at = datetime('now'), call_count = call_count + 1 WHERE id = ?"
-    ).run(lead_id);
-  }
+      `INSERT INTO call_logs (id, lead_id, user_id, campaign_id, direction, outcome, duration_seconds, recording_url, notes, transcript, sip_call_id, started_at, ended_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id,
+      lead_id || null,
+      user_id || req.userId || null,
+      campaign_id || null,
+      direction || "outbound",
+      outcome || "no_answer",
+      duration_seconds || 0,
+      recording_url || null,
+      notes || null,
+      transcript || null,
+      sip_call_id || null,
+      started_at || null,
+      ended_at || null
+    );
+
+    if (!lead_id) return;
+
+    if (outcome === "dnc") {
+      const lead = db.prepare("SELECT phone FROM leads WHERE id = ?").get(lead_id) as
+        | { phone: string | null }
+        | undefined;
+      db.prepare(
+        "UPDATE leads SET last_called_at = datetime('now'), call_count = call_count + 1, dnc = 1, status = 'do_not_contact', updated_at = ? WHERE id = ?"
+      ).run(new Date().toISOString(), lead_id);
+
+      const phone = normalizePhone(lead?.phone);
+      if (phone) {
+        const existingDnc = (db.prepare("SELECT id, phone FROM dnc_list").all() as Array<{ id: string; phone: string }>)
+          .find((entry) => normalizePhone(entry.phone) === phone);
+        if (existingDnc) {
+          db.prepare("UPDATE dnc_list SET reason = ?, source = ? WHERE id = ?")
+            .run("Marked do not contact after call", "call_log", existingDnc.id);
+        } else {
+          db.prepare(
+            "INSERT INTO dnc_list (id, phone, reason, source, created_by) VALUES (?, ?, ?, ?, ?)"
+          ).run(uuid(), phone, "Marked do not contact after call", "call_log", req.userId ?? null);
+        }
+      }
+      return;
+    }
+
+    db.prepare(
+      "UPDATE leads SET last_called_at = datetime('now'), call_count = call_count + 1, updated_at = ? WHERE id = ?"
+    ).run(new Date().toISOString(), lead_id);
+  });
+
+  saveCallLog();
 
   const row = db.prepare("SELECT * FROM call_logs WHERE id = ?").get(id) as any;
   res.status(201).json(mapCallLog(row));

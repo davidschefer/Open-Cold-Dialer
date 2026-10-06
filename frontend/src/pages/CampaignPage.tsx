@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { useCreateCampaign } from "@/hooks/useCampaigns";
-import { useDeleteCampaign } from "@/hooks/useCampaigns";
+import { useCampaigns, useCreateCampaign, useDeleteCampaign, useUpdateCampaign } from "@/hooks/useCampaigns";
+import { useScripts } from "@/hooks/useScripts";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Plus, Edit3, Trash2, Filter, Search, Target, Clock } from "lucide-react";
@@ -12,15 +10,10 @@ import { CampaignForm } from "@/components/campaigns/CampaignForm";
 type Campaign = Database["public"]["Tables"]["campaigns"]["Row"];
 
 export function CampaignPage() {
-  const { data: campaigns, isLoading } = useQuery<Campaign[]>({
-    queryKey: ["campaigns"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("campaigns").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const { data: campaigns = [], isLoading } = useCampaigns();
+  const { data: scripts = [] } = useScripts();
   const createCampaign = useCreateCampaign();
+  const updateCampaign = useUpdateCampaign();
   const deleteCampaign = useDeleteCampaign();
 
   const [showForm, setShowForm] = useState(false);
@@ -28,9 +21,9 @@ export function CampaignPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<Campaign | null>(null);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+  const [feedback, setFeedback] = useState("");
 
   const filtered = useMemo(() => {
-    if (!campaigns) return [];
     return campaigns.filter((c) => {
       const matchesStatus = statusFilter === "all" || c.status === statusFilter;
       const q = searchQuery.toLowerCase();
@@ -41,8 +34,13 @@ export function CampaignPage() {
   }, [campaigns, statusFilter, searchQuery]);
 
   async function handleDelete(campaign: Campaign) {
-    await deleteCampaign.mutateAsync(campaign.id);
-    setDeleteConfirm(null);
+    try {
+      await deleteCampaign.mutateAsync(campaign.id);
+      setFeedback("Campaign deleted.");
+      setDeleteConfirm(null);
+    } catch (err) {
+      setFeedback(err instanceof Error ? err.message : "Unable to delete campaign.");
+    }
   }
 
   return (
@@ -60,6 +58,8 @@ export function CampaignPage() {
           New Campaign
         </button>
       </div>
+
+      {feedback && <p className="text-sm text-brand-700 bg-brand-50 border border-brand-100 rounded-lg px-3 py-2">{feedback}</p>}
 
       <div className="flex gap-3">
         <div className="relative flex-1">
@@ -104,6 +104,10 @@ export function CampaignPage() {
                 <Clock className="w-4 h-4" />
                 <span>Created {new Date(campaign.created_at).toLocaleDateString()}</span>
               </div>
+              {(() => {
+                const campaignScripts = scripts.filter((script) => script.campaign_id === campaign.id);
+                return <p className="text-xs text-gray-500 mt-3">{campaignScripts.length ? `Scripts: ${campaignScripts.map((script) => script.title).join(", ")}` : "No associated scripts"}</p>;
+              })()}
               <div className="flex gap-2 mt-4 pt-3 border-t border-gray-100">
                 <button
                   onClick={() => setEditingCampaign(campaign)}
@@ -127,8 +131,31 @@ export function CampaignPage() {
         <CampaignForm
           onClose={() => setShowForm(false)}
           onSubmit={async (data) => {
-            await createCampaign.mutateAsync(data);
-            setShowForm(false);
+            try {
+              await createCampaign.mutateAsync(data);
+              setFeedback("Campaign created.");
+              setShowForm(false);
+            } catch (err) {
+              setFeedback(err instanceof Error ? err.message : "Unable to create campaign.");
+              throw err;
+            }
+          }}
+        />
+      )}
+
+      {editingCampaign && (
+        <CampaignForm
+          initialData={editingCampaign}
+          onClose={() => setEditingCampaign(null)}
+          onSubmit={async (data) => {
+            try {
+              await updateCampaign.mutateAsync({ id: editingCampaign.id, ...data });
+              setFeedback("Campaign updated.");
+              setEditingCampaign(null);
+            } catch (err) {
+              setFeedback(err instanceof Error ? err.message : "Unable to update campaign.");
+              throw err;
+            }
           }}
         />
       )}

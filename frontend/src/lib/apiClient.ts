@@ -9,6 +9,18 @@ export interface RestAuthUser {
   role: "admin" | "agent" | "manager";
 }
 
+export interface DncCheck {
+  phone: string;
+  dnc: boolean;
+  entry: {
+    id: string;
+    phone: string;
+    reason: string | null;
+    source: string | null;
+    created_at: string;
+  } | null;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -85,6 +97,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ rows }),
       }),
+  },
+
+  dnc: {
+    check: (phone: string) =>
+      request<DncCheck>(`/api/dnc/check?phone=${encodeURIComponent(phone)}`),
+    add: (data: { phone: string; reason?: string; source?: string; lead_id?: string }) =>
+      request<any>("/api/dnc", { method: "POST", body: JSON.stringify(data) }),
+    remove: (phone: string) =>
+      request<void>(`/api/dnc/${encodeURIComponent(phone)}`, { method: "DELETE" }),
   },
 
   campaigns: {

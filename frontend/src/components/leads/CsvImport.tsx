@@ -20,7 +20,7 @@ interface CsvRow {
 
 interface CsvImportProps {
   onClose: () => void;
-  onImport: (rows: CsvRow[]) => Promise<void>;
+  onImport: (rows: CsvRow[]) => Promise<{ imported: number; total: number }>;
 }
 
 const csvColumns = [
@@ -34,6 +34,7 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
   const [parsedData, setParsedData] = useState<CsvRow[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [result, setResult] = useState<{ imported: number; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,6 +45,7 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
     setParsedData([]);
     setHeaders([]);
     setMapping({});
+    setResult(null);
 
     Papa.parse<CsvRow>(f, {
       header: true,
@@ -62,6 +64,7 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
   async function handleImport() {
     if (!parsedData.length) return;
     setLoading(true);
+    setError("");
     try {
       const mapped = parsedData.map((row) => {
         const mappedRow: CsvRow = {};
@@ -73,7 +76,9 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
         });
         return mappedRow;
       });
-      await onImport(mapped);
+      setResult(await onImport(mapped));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to import the CSV file");
     } finally {
       setLoading(false);
     }
@@ -155,13 +160,19 @@ export function CsvImport({ onClose, onImport }: CsvImportProps) {
                   </tbody>
                 </table>
               </div>
+              {result && (
+                <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+                  Imported {result.imported} of {result.total} rows.
+                </p>
+              )}
+              {error && <p className="text-sm text-red-600">{error}</p>}
               <div className="flex justify-between">
                 <button type="button" onClick={() => { setParsedData([]); setMapping({}); }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Change File</button>
                 <div className="flex gap-3">
-                  <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
-                  <button type="button" onClick={handleImport} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition">
+                  <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">{result ? "Close" : "Cancel"}</button>
+                  {!result && <button type="button" onClick={handleImport} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition">
                     {loading ? "Importing..." : "Import"}
-                  </button>
+                  </button>}
                 </div>
               </div>
             </div>

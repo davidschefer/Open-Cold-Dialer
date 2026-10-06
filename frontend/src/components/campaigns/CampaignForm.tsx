@@ -16,10 +16,13 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
   const [status, setStatus] = useState<"active" | "paused" | "completed">(initialData?.status ?? "active");
   const [settingsText, setSettingsText] = useState<string>(JSON.stringify(initialData?.settings ?? {}, null, 2));
   const [settingsError, setSettingsError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSettingsError("");
+    setSubmitError("");
 
     let parsedSettings: Record<string, unknown> | null = null;
     const trimmed = settingsText.trim();
@@ -32,7 +35,14 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
       }
     }
 
-    await onSubmit({ name, type, status, settings: parsedSettings });
+    setSaving(true);
+    try {
+      await onSubmit({ name, type, status, settings: parsedSettings });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Unable to save campaign.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -43,6 +53,7 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {submitError && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg p-3">{submitError}</p>}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Campaign Name</label>
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" />
@@ -66,13 +77,13 @@ export function CampaignForm({ onClose, onSubmit, initialData }: CampaignFormPro
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Settings (JSON)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Advanced settings (JSON)</label>
             <textarea value={settingsText} onChange={(e) => setSettingsText(e.target.value)} rows={4} className={`w-full px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none ${settingsError ? "border-red-300 bg-red-50" : "border-gray-300"}`} />
             {settingsError && <p className="text-xs text-red-600 mt-1">{settingsError}</p>}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">Cancel</button>
-            <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition">Save Campaign</button>
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 rounded-lg transition">{saving ? "Saving..." : "Save Campaign"}</button>
           </div>
         </form>
       </div>
