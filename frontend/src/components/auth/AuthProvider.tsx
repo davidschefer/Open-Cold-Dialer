@@ -1,68 +1,50 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { getCurrentUser, signOut as clearRestSession, type AuthUser } from "@/lib/auth";
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
+  refreshSession: () => Promise<AuthUser | null>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  refreshSession: async () => null,
+  logout: async () => {},
 });
 
-const DEV_USER: User = {
-  id: "dev-user-001",
-  app_metadata: { provider: "email", providers: ["email"] },
-  user_metadata: { full_name: "Admin User", avatar_url: null },
-  aud: "authenticated",
-  created_at: new Date().toISOString(),
-  email: "dev@example.com",
-  email_confirmed_at: new Date().toISOString(),
-  last_sign_in_at: new Date().toISOString(),
-  role: "authenticated",
-  updated_at: new Date().toISOString(),
-  phone: undefined,
-  confirmed_at: new Date().toISOString(),
-} as User;
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!(supabase as any).isConfigured) {
-      setUser(DEV_USER);
+  const refreshSession = useCallback(async (): Promise<AuthUser | null> => {
+    setLoading(true);
+    try {
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+      return currentUser;
+    } catch {
+      // Do not fabricate a development user when session validation fails.
+      setUser(null);
+      return null;
+    } finally {
       setLoading(false);
-      return;
     }
-
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
-      if (session?.user) {
-        setUser(session.user);
-      } else {
-        console.warn("No active Supabase session. Using dev user for development.");
-        setUser(DEV_USER);
-      }
-      setLoading(false);
-    }).catch(() => {
-      setUser(DEV_USER);
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: string, session: any) => {
-        setUser(session?.user ?? DEV_USER);
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
   }, []);
 
+  const logout = useCallback(async () => {
+    clearRestSession();
+    setUser(null);
+  }, []);
+
+  useEffect(() => {
+    void refreshSession();
+  }, [refreshSession]);
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, refreshSession, logout }}>
       {children}
     </AuthContext.Provider>
   );

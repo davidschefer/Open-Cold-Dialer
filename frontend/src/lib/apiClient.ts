@@ -2,6 +2,23 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 
 let authToken: string | null = localStorage.getItem("cold-dialer-token");
 
+export interface RestAuthUser {
+  id: string;
+  email: string;
+  fullName: string | null;
+  role: "admin" | "agent" | "manager";
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export function setAuthToken(token: string | null) {
   authToken = token;
   if (token) {
@@ -32,7 +49,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || `Request failed: ${res.status}`);
+    throw new ApiError(body.error || `Request failed: ${res.status}`, res.status);
   }
 
   if (res.status === 204) return undefined as T;
@@ -42,16 +59,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export const api = {
   auth: {
     signup: (email: string, password: string, fullName: string) =>
-      request<{ user: any; token: string }>("/api/auth/signup", {
+      request<{ user: RestAuthUser; token: string }>("/api/auth/signup", {
         method: "POST",
         body: JSON.stringify({ email, password, fullName }),
       }),
     login: (email: string, password: string) =>
-      request<{ user: any; token: string }>("/api/auth/login", {
+      request<{ user: RestAuthUser; token: string }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       }),
-    me: () => request<any>("/api/auth/me"),
+    me: () => request<RestAuthUser>("/api/auth/me"),
   },
 
   leads: {

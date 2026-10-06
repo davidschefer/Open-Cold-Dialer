@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signIn } from "@/lib/auth";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { publicSignupEnabled } from "@/lib/runtimeConfig";
 import { LogIn, Mail, Lock, AlertCircle } from "lucide-react";
 import { z } from "zod";
 
@@ -11,6 +13,7 @@ const loginSchema = z.object({
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -36,6 +39,10 @@ export function LoginPage() {
     setLoading(true);
     try {
       await signIn(email, password);
+      const user = await refreshSession();
+      if (!user) {
+        throw new Error("Unable to restore your session. Please try again.");
+      }
       navigate("/dashboard");
     } catch (err: any) {
       setError(err.message ?? "Login failed");
@@ -101,12 +108,14 @@ export function LoginPage() {
               </>
             )}
           </button>
-          <p className="text-center text-sm text-gray-500">
-            Don't have an account?{" "}
-            <Link to="/signup" className="font-medium text-brand-600 hover:text-brand-700">
-              Create one
-            </Link>
-          </p>
+          {publicSignupEnabled && (
+            <p className="text-center text-sm text-gray-500">
+              Don't have an account?{" "}
+              <Link to="/signup" className="font-medium text-brand-600 hover:text-brand-700">
+                Create one
+              </Link>
+            </p>
+          )}
         </form>
       </div>
     </div>

@@ -17,13 +17,6 @@ function createNoOpTable() {
 
 const mockSupabase = {
   from: (_table: string) => createNoOpTable(),
-  auth: {
-    getSession: async () => ({ data: { session: null }, error: null }),
-    onAuthStateChange: (_cb: unknown) => ({ data: { subscription: { unsubscribe: () => {} } } }),
-    signInWithPassword: async () => ({ data: { user: null, session: null }, error: { message: "Not configured" } }),
-    signUp: async () => ({ data: { user: null, session: null }, error: { message: "Not configured" } }),
-    signOut: async () => ({ error: null }),
-  },
   channel: () => ({
     on: () => ({ unsubscribe: () => {} }),
     subscribe: () => {},
@@ -40,9 +33,3 @@ export const supabase = isConfigured
       },
     })
   : (mockSupabase as any);
-
-if (!isConfigured) {
-  console.warn(
-    "Missing Supabase environment variables. VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set."
-  );
-}

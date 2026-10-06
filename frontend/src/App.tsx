@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Layout } from "@/components/common/Layout";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { publicSignupEnabled } from "@/lib/runtimeConfig";
 
 const LoginPage = React.lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const SignupPage = React.lazy(() => import("@/pages/SignupPage").then((m) => ({ default: m.SignupPage })));
@@ -41,7 +42,16 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Suspense fallback={<PageSpinner />}><LoginPage /></Suspense>} />
-      <Route path="/signup" element={<Suspense fallback={<PageSpinner />}><SignupPage /></Suspense>} />
+      <Route
+        path="/signup"
+        element={
+          publicSignupEnabled ? (
+            <Suspense fallback={<PageSpinner />}><SignupPage /></Suspense>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
       <Route
         path="/*"
         element={

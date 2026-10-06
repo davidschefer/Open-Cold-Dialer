@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { signUp } from "@/lib/auth";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { UserPlus, Mail, Lock, AlertCircle, User } from "lucide-react";
 import { z } from "zod";
 
@@ -16,6 +17,7 @@ const signupSchema = z.object({
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const { refreshSession } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,7 +45,11 @@ export function SignupPage() {
     setLoading(true);
     try {
       await signUp(email, password, fullName);
-      navigate("/login");
+      const user = await refreshSession();
+      if (!user) {
+        throw new Error("Unable to restore your session. Please try again.");
+      }
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err.message ?? "Signup failed");
     } finally {

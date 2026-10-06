@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { signOut } from "@/lib/auth";
 import {
   LayoutDashboard,
   Users,
@@ -28,11 +27,11 @@ const navItems = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   async function handleSignOut() {
-    await signOut();
+    await logout();
     navigate("/login");
   }
 
@@ -88,7 +87,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">
-                {user?.user_metadata?.full_name ?? user?.email ?? "User"}
+                {user?.fullName ?? user?.email ?? "User"}
               </p>
               <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>
